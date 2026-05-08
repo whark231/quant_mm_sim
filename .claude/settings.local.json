@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-Content \"c:\\\\Users\\\\mufas\\\\Documents\\\\Quant Projects\\\\quant_mm_sim\\\\notebooks\\\\01_data_exploration.ipynb\" -Raw)"
+    ]
+  }
+}
