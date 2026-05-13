@@ -20,12 +20,14 @@ class OrderStatus(Enum):
 @dataclass
 class Order:
     price: float
+    filled_price: float = None
     size: float
     side: Side
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     filled_size: float = 0.0
     status: OrderStatus = OrderStatus.OPEN
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    arrival_time: datetime
 
     @property
     def remaining_size(self) -> float:
@@ -37,7 +39,7 @@ class Order:
 
     def fill(self, quantity: float) -> None:
         self.filled_size += quantity
-        if self.remaining_size >= 0:
+        if self.remaining_size > 0:
             self.status = OrderStatus.PARTIALLY_FILLED
         else:
             self.status = OrderStatus.FILLED
@@ -58,8 +60,8 @@ class Order:
         else:
             return self.price < other.price
         
-    def earlier_order_than(self, other):
-        return self.timestamp < other.timestamp
+    def earlier_arrival_than(self, other):
+        return self.arrival_time < other.arrival_time
         
 class OrderBook:
     def __init__(self):
@@ -70,6 +72,7 @@ class OrderBook:
     
     def add_order(self, order):
         self.orders[order.id] = order
+        order.arrival_time = datetime.now(timezone.utc)
         if order.side == Side.BID:
             heapq.heappush(self.bids, (-order.price, order))
             if self.best_bid and self.best_ask:
@@ -78,7 +81,6 @@ class OrderBook:
             heapq.heappush(self.asks, order)
             if self.best_bid and self.best_ask:
                 assert self.best_ask > self.best_bid, f"Crossed book: bid {self.best_bid} >= ask {self.best_ask}"
-
     
     @property
     def best_bid(self):
@@ -94,17 +96,31 @@ class OrderBook:
     
     def match_orders(self):
 
-        while self.best_bid >= self.best_ask:
-            bid = self.best_bid[0][1]
-            ask = self.best_ask[0]
-            fill_quantity = min(bid.size, ask.size)
-            resting_order = bid if bid.earlier_order_than(ask) else ask
+        while self.best_bid is not None and self.best_ask is not None and self.best_bid >= self.best_ask:
 
-            # Execute trade at resting order
-            resting_order.fill(fill_quantity)
+            while self.bids and not self.bids[0][1].is_active:
+                    heapq.heappop(self.bids)
+            while self.asks and not self.asks[0].is_active:
+                heapq.heappop(self.asks)
+                
+            # Re-check after cleanup
+            if not self.bids or not self.asks:
+                break
+
+            bid = self.bids[0][1]
+            ask = self.asks[0]
+            fill_quantity = min(bid.size, ask.size)
+            resting_order_price = bid.price if bid.earlier_arrival_than(ask) else ask.price
+
+            bid.filled_price = resting_order_price
+            ask.filled_price = resting_order_price
+
+            # Execute trades
+            bid.fill(fill_quantity)
+            ask.fill(fill_quantity)
 
             if not bid.is_active:
                 self.remove_order(bid)
             
             if not ask.is_active:
-                self.remove_order(bid)
+                self.remove_order(ask)
