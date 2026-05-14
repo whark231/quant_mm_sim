@@ -118,8 +118,6 @@ class OrderBook:
             if not self.bids or not self.asks:
                 break
 
-            print(f"After Lazy Deletion - best_bid: {self.best_bid}, best_ask: {self.best_ask}")
-
             bid = self.bids[0][1]
             ask = self.asks[0]
             fill_quantity = min(bid.remaining_size, ask.remaining_size)
@@ -132,10 +130,6 @@ class OrderBook:
             bid.fill(fill_quantity)
             ask.fill(fill_quantity)
 
-            print(f"After filling - best_bid: {self.best_bid}, best_ask: {self.best_ask}")
-            print(f"Bid: {bid}")
-            print(f"Ask: {ask}")
-
             if not bid.is_active:
                 del self.orders[bid.id]
             if not ask.is_active:
@@ -144,3 +138,19 @@ class OrderBook:
         if self.best_bid is not None and self.best_ask is not None:
                 print(f"After matching - best_bid: {self.best_bid}, best_ask: {self.best_ask}")
                 assert self.best_ask > self.best_bid, f"Crossed book after matching: bid {self.best_bid} >= ask {self.best_ask}"
+
+    
+    def print_book(self):
+        print("=== ORDER BOOK ===")
+        print(f"Best Ask: {self.best_ask}")
+        print(f"Mid Price: {self.mid_price}")
+        print(f"Best Bid: {self.best_bid}")
+        print(f"Spread: {self.best_ask - self.best_bid if self.best_ask and self.best_bid else 'N/A'}")
+        print("\n-- ASKS --")
+        for price, order in sorted(self.asks, key=lambda x: x.price):
+            print(f"  ${order.price:.2f} | {order.remaining_size:.4f} BTC | {order.status.value}")
+        print("\n-- BIDS --")
+        for neg_price, order in sorted(self.bids, key=lambda x: -x[0]):
+            print(f"  ${order.price:.2f} | {order.remaining_size:.4f} BTC | {order.status.value}")
+        print(f"\nTotal orders tracked: {len(self.orders)}")
+        print("==================")
