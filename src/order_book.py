@@ -39,7 +39,6 @@ class Order:
 
     def fill(self, quantity: float) -> None:
         self.filled_size += quantity
-        print(f"After fill: remaining={self.remaining_size}, status will be={'FILLED' if self.remaining_size <= 0 else 'PARTIAL'}")
         if self.remaining_size > 0:
             self.status = OrderStatus.PARTIALLY_FILLED
         else:
@@ -108,12 +107,6 @@ class OrderBook:
 
         while self.best_bid is not None and self.best_ask is not None and self.best_bid >= self.best_ask:
 
-            print(f"Top of bids heap: {self.bids[0]}")
-            print(f"Top of asks heap: {self.asks[0]}")
-            print(f"best_bid: {self.best_bid}, best_ask: {self.best_ask}")
-            print(f"bids[0] type: {type(self.bids[0])}")
-            print(f"bids[0]: {self.bids[0]}")
-
             cleaned = False
             while self.bids and not self.bids[0][1].is_active:
                 heapq.heappop(self.bids)
@@ -146,7 +139,6 @@ class OrderBook:
                 del self.orders[ask.id]
             
         if self.best_bid is not None and self.best_ask is not None:
-                print(f"After matching - best_bid: {self.best_bid}, best_ask: {self.best_ask}")
                 assert self.best_ask > self.best_bid, f"Crossed book after matching: bid {self.best_bid} >= ask {self.best_ask}"
 
     
