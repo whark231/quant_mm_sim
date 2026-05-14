@@ -147,10 +147,10 @@ class OrderBook:
         print(f"Best Bid: {self.best_bid}")
         print(f"Spread: {self.best_ask - self.best_bid if self.best_ask and self.best_bid else 'N/A'}")
         print("\n-- ASKS --")
-        for price, order in sorted(self.asks, key=lambda x: x.price):
+        for order in sorted(self.asks, key=lambda x: x.price):
             print(f"  ${order.price:.2f} | {order.remaining_size:.4f} BTC | {order.status.value}")
         print("\n-- BIDS --")
-        for neg_price, order in sorted(self.bids, key=lambda x: -x[0]):
+        for neg_price, order in sorted(self.bids, key=lambda x: x[0]):
             print(f"  ${order.price:.2f} | {order.remaining_size:.4f} BTC | {order.status.value}")
         print(f"\nTotal orders tracked: {len(self.orders)}")
         print("==================")
