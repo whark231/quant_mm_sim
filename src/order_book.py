@@ -53,6 +53,19 @@ class Order:
             f"price={self.price}, size={self.size}, filled={self.filled_size}, "
             f"ts={self.timestamp.isoformat()})"
         )
+
+    def print(self) -> None:
+        filled_price_str = f"${self.filled_price:,.2f}" if self.filled_price is not None else "N/A"
+        print(
+            f"Order ID : {self.id[:8]}\n"
+            f"Side     : {self.side.value.upper()}\n"
+            f"Price    : ${self.price:,.2f}\n"
+            f"Size     : {self.size} BTC\n"
+            f"Filled   : {self.filled_size} / {self.size} BTC\n"
+            f"Fill Price: {filled_price_str}\n"
+            f"Status   : {self.status.value}\n"
+            f"Timestamp: {self.timestamp.isoformat()}"
+        )
     
     def __lt__(self, other):
         if self.price == other.price:
@@ -94,6 +107,8 @@ class OrderBook:
 
         while self.best_bid is not None and self.best_ask is not None and self.best_bid >= self.best_ask:
 
+            print(f"Before Lazy Deletion - best_bid: {self.best_bid}, best_ask: {self.best_ask}")
+
             while self.bids and not self.bids[0][1].is_active:
                 heapq.heappop(self.bids)
             while self.asks and not self.asks[0].is_active:
@@ -102,6 +117,8 @@ class OrderBook:
             # Re-check after cleanup
             if not self.bids or not self.asks:
                 break
+
+            print(f"After Lazy Deletion - best_bid: {self.best_bid}, best_ask: {self.best_ask}")
 
             bid = self.bids[0][1]
             ask = self.asks[0]
@@ -114,6 +131,10 @@ class OrderBook:
             # Execute trades
             bid.fill(fill_quantity)
             ask.fill(fill_quantity)
+
+            print(f"After filling - best_bid: {self.best_bid}, best_ask: {self.best_ask}")
+            print(f"Bid: {bid}")
+            print(f"Ask: {ask}")
 
             if not bid.is_active:
                 del self.orders[bid.id]
