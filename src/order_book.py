@@ -20,14 +20,14 @@ class OrderStatus(Enum):
 @dataclass
 class Order:
     price: float
-    filled_price: float = None
     size: float
     side: Side
+    filled_price: float = None
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     filled_size: float = 0.0
     status: OrderStatus = OrderStatus.OPEN
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    arrival_time: datetime
+    arrival_time: datetime = None
 
     @property
     def remaining_size(self) -> float:
@@ -75,12 +75,8 @@ class OrderBook:
         order.arrival_time = datetime.now(timezone.utc)
         if order.side == Side.BID:
             heapq.heappush(self.bids, (-order.price, order))
-            if self.best_bid and self.best_ask:
-                assert self.best_ask > self.best_bid, f"Crossed book: bid {self.best_bid} >= ask {self.best_ask}"
         else:
             heapq.heappush(self.asks, order)
-            if self.best_bid and self.best_ask:
-                assert self.best_ask > self.best_bid, f"Crossed book: bid {self.best_bid} >= ask {self.best_ask}"
     
     @property
     def best_bid(self):
@@ -99,7 +95,7 @@ class OrderBook:
         while self.best_bid is not None and self.best_ask is not None and self.best_bid >= self.best_ask:
 
             while self.bids and not self.bids[0][1].is_active:
-                    heapq.heappop(self.bids)
+                heapq.heappop(self.bids)
             while self.asks and not self.asks[0].is_active:
                 heapq.heappop(self.asks)
                 
@@ -118,9 +114,6 @@ class OrderBook:
             # Execute trades
             bid.fill(fill_quantity)
             ask.fill(fill_quantity)
-
-            if not bid.is_active:
-                self.remove_order(bid)
             
-            if not ask.is_active:
-                self.remove_order(ask)
+            if self.best_bid is not None and self.best_ask is not None:
+                assert self.best_ask > self.best_bid, f"Crossed book after matching: bid {self.best_bid} >= ask {self.best_ask}"
