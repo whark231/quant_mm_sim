@@ -105,7 +105,7 @@ class OrderBook:
 
             bid = self.bids[0][1]
             ask = self.asks[0]
-            fill_quantity = min(bid.size, ask.size)
+            fill_quantity = min(bid.remaining_size, ask.remaining_size)
             resting_order_price = bid.price if bid.earlier_arrival_than(ask) else ask.price
 
             bid.filled_price = resting_order_price
@@ -114,6 +114,12 @@ class OrderBook:
             # Execute trades
             bid.fill(fill_quantity)
             ask.fill(fill_quantity)
+
+            if not bid.is_active:
+                del self.orders[bid.id]
+            if not ask.is_active:
+                del self.orders[ask.id]
             
-            if self.best_bid is not None and self.best_ask is not None:
+        if self.best_bid is not None and self.best_ask is not None:
+                print(f"After matching - best_bid: {self.best_bid}, best_ask: {self.best_ask}")
                 assert self.best_ask > self.best_bid, f"Crossed book after matching: bid {self.best_bid} >= ask {self.best_ask}"
