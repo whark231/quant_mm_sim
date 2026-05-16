@@ -13,6 +13,8 @@ class MarketMaker():
         self.kappa = kappa # order arrival sensitvity
         self.session_start = None
         self.session_duration_hours = 8.0 # trading day length
+        self.current_bid_id = None
+        self.current_ask_id = None
 
 
     @property 
@@ -47,7 +49,8 @@ class MarketMaker():
             self.cash += order.filled_size * order.filled_price
 
     def cancel_quotes(self):
-        None
+        self.current_bid_ask = None
+        self.current_bid_ask = None
 
     def get_quotes(self):
         # Compensation for holding risk over remaining time
