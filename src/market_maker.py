@@ -18,6 +18,7 @@ class MarketMaker():
         self.session_duration_hours = 8.0 # trading day length
         self.current_bid_id = None
         self.current_ask_id = None
+        self.is_quoting = True
 
 
     @property
@@ -54,17 +55,21 @@ class MarketMaker():
         self.current_bid_ask = None
         self.current_bid_ask = None
 
-    def get_quotes(self, mid_price: float, dynamic_sigma: float):
+    def get_quotes(self, mid_price: float, dynamic_sigma: float, ofi: float, scaling_factor: float = 2.0):
         # Compensation for holding risk over remaining time
         risk_term = self.dynamic_gamma * dynamic_sigma**2 * self.time_remaining
 
         # Compensation for providing liquidity given order arrival rate
         liquidity_term = (2 / self.dynamic_gamma) * math.log(1 + self.dynamic_gamma / self.kappa)
 
-        spread =  risk_term + liquidity_term
+        base_spread =  risk_term + liquidity_term
 
-        bid = self.reservation_price(mid_price, dynamic_sigma) - spread / 2
-        ask = self.reservation_price(mid_price, dynamic_sigma) + spread / 2
+        ofi_multiplier = 1 + scaling_factor * abs(ofi)
+        spread = base_spread * ofi_multiplier
+
+        r = self.reservation_price(mid_price, dynamic_sigma)
+        bid = r - spread / 2
+        ask = r + spread / 2
         return bid, ask
     
     def print_quotes(self) -> None:

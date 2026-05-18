@@ -34,12 +34,24 @@ class Simulator():
             return 2.0  # fallback default
         data = self.price_history[-self.mid_price_window:]
         return np.std([(curr - prev) / prev for prev, curr in zip(data, data[1:])], ddof=1)
+    
+    
+    def current_ofi(self, i: int, ofi_window: int = 50) -> float:
+        window = self.df.iloc[max(0, i - ofi_window):i]
+
+        buy_volume = float(window[window['side'] == 'buy']['size'].sum())
+        sell_volume = float(window[window['side'] == 'sell']['size'].sum())
+
+        if (buy_volume + sell_volume) == 0:
+            return 0.0
+
+        return (buy_volume - sell_volume) / (buy_volume + sell_volume)
 
 
     # Records performance during simulation
-    def record_state(self, i):
+    def record_state(self, i: int, ofi: float):
         mid = self.current_mid_price
-        bid, ask = self.mm.get_quotes(mid, self.dynamic_sigma)
+        bid, ask = self.mm.get_quotes(mid, self.dynamic_sigma, ofi)
         self.record['Time'].append(i)
         self.record['Mid_Price'].append(mid)
         self.record['Reservation_Price'].append(self.mm.reservation_price(mid, self.dynamic_sigma))
@@ -71,8 +83,11 @@ class Simulator():
         self.mm.cancel_quotes()
 
     # Posts new quotes
-    def post_new_quotes(self):
-        bid, ask = self.mm.get_quotes(self.current_mid_price, self.dynamic_sigma)
+    def post_new_quotes(self, ofi: float):
+        if not self.mm.is_quoting:
+            return
+        
+        bid, ask = self.mm.get_quotes(self.current_mid_price, self.dynamic_sigma, ofi)
         bid_order = Order(price=bid, size=0.01, side=Side.BID)
         ask_order = Order(price=ask, size=0.01, side=Side.ASK)
 
@@ -108,14 +123,16 @@ class Simulator():
             self.book.add_order(order)        
         
     # runs the simulation
-    def run(self):
+    def run(self, pause_threshold: float = 0.8):
         self.warmup()
         for i in range(len(self.df)):
+            ofi = self.current_ofi(i)
+            self.mm.is_quoting = abs(ofi) <= pause_threshold
             self.update_market(i)
             self.cancel_old_quotes()
-            self.post_new_quotes()
+            self.post_new_quotes(ofi)
             self.check_for_fills(i)
-            self.record_state(i)
+            self.record_state(i, ofi)
 
 
 
