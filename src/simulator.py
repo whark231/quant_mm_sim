@@ -4,7 +4,7 @@ import pandas as pd
 
 
 class Simulator():
-    def __init__(self, mm: MarketMaker, book: OrderBook, df: pd.DataFrame):
+    def __init__(self, mm: MarketMaker, book: OrderBook, df: pd.DataFrame, window: int):
         self.mm = mm
         self.book = book
         self.df = df
@@ -18,13 +18,21 @@ class Simulator():
             'PnL' : [],
             'Spread' : []
         }
+        self.price_history = []
+        self.mid_price_window = window
+
+    @property
+    def current_mid_price(self) -> float:
+        if len(self.price_history) < 2:
+            return None
+        return sum(self.price_history[-self.mid_price_window:]) / min(len(self.price_history), self.mid_price_window)
 
     # Records performance during simulation
     def record_state(self, i):
-        bid, ask = self.mm.get_quotes()
+        bid, ask = self.mm.get_quotes(self.current_mid_price)
         self.record['Time'].append(i)
-        self.record['Mid_Price'].append(self.book.mid_price)
-        self.record['Reservation_Price'].append(self.mm.reservation_price)
+        self.record['Mid_Price'].append(self.current_mid_price)
+        self.record['Reservation_Price'].append(self.mm.reservation_price(self.current_mid_price))
         self.record['Bid'].append(bid)
         self.record['Ask'].append(ask)
         self.record['Position'].append(self.mm.position)
@@ -38,6 +46,7 @@ class Simulator():
     # Add historical trade to the order book -> moves mid-price
     def update_market(self, i):
         row = self.df.iloc[i]
+        self.price_history.append(row['price'])
         side = Side.BID if row['side'] == 'buy' else Side.ASK
         order = Order(row['price'], row['size'], side)
 
@@ -53,7 +62,7 @@ class Simulator():
 
     # Posts new quotes
     def post_new_quotes(self):
-        bid, ask = self.mm.get_quotes()
+        bid, ask = self.mm.get_quotes(self.current_mid_price)
         bid_order = Order(price=bid, size=0.01, side=Side.BID)
         ask_order = Order(price=ask, size=0.01, side=Side.ASK)
 
@@ -80,16 +89,17 @@ class Simulator():
                 self.mm.update_inventory(Side.ASK, min(trade['size'], ask_order.remaining_size), trade['price'])
 
     # populate order book with a few orders
-    def warmup(self, n=20):
-        for i in range(n):
+    def warmup(self):
+        for i in range(self.mid_price_window):
             row = self.df.iloc[i]
+            self.price_history.append(row['price'])
             side = Side.BID if row['side'] == 'buy' else Side.ASK
             order = Order(price=row['price'], size=row['size'], side=side)
             self.book.add_order(order)
         
     # runs the simulation
-    def run(self, warmup_periods=20):
-        self.warmup(warmup_periods)
+    def run(self):
+        self.warmup()
         for i in range(len(self.df)):
             self.update_market(i)
             self.cancel_old_quotes()

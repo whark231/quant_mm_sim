@@ -22,12 +22,6 @@ class MarketMaker():
         return self.cash + self.position * self.order_book.mid_price
 
     @property
-    def reservation_price(self) -> float:
-        # How much we discount the mid_price based on inventory risk
-        inventory_penalty = self.position * self.gamma * self.sigma**2 * self.time_remaining
-        return self.order_book.mid_price - inventory_penalty
-
-    @property
     def dynamic_gamma(self) -> float:
         return self.gamma
     
@@ -40,6 +34,11 @@ class MarketMaker():
         elapsed_fraction = elapsed / (self.session_duration_hours * 3600)
         return max(0.0, 1.0 - elapsed_fraction)
 
+    def reservation_price(self, mid_price: float) -> float:
+        # How much we discount the mid_price based on inventory risk
+        inventory_penalty = self.position * self.gamma * self.sigma**2 * self.time_remaining
+        return mid_price - inventory_penalty
+    
     def update_inventory(self, side: Side, filled_size: float, filled_price: float):
         if side == Side.BID:
             self.position += filled_size
@@ -52,7 +51,7 @@ class MarketMaker():
         self.current_bid_ask = None
         self.current_bid_ask = None
 
-    def get_quotes(self):
+    def get_quotes(self, mid_price: float):
         # Compensation for holding risk over remaining time
         risk_term = self.gamma * self.sigma**2 * self.time_remaining
 
@@ -61,8 +60,8 @@ class MarketMaker():
 
         spread =  risk_term + liquidity_term
 
-        bid = self.reservation_price - spread / 2
-        ask = self.reservation_price + spread / 2
+        bid = self.reservation_price(mid_price) - spread / 2
+        ask = self.reservation_price(mid_price) + spread / 2
         return bid, ask
     
     def print_quotes(self) -> None:
