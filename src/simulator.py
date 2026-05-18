@@ -29,14 +29,15 @@ class Simulator():
 
     # Records performance during simulation
     def record_state(self, i):
-        bid, ask = self.mm.get_quotes(self.current_mid_price)
+        mid = self.current_mid_price
+        bid, ask = self.mm.get_quotes(mid)
         self.record['Time'].append(i)
-        self.record['Mid_Price'].append(self.current_mid_price)
-        self.record['Reservation_Price'].append(self.mm.reservation_price(self.current_mid_price))
+        self.record['Mid_Price'].append(mid)
+        self.record['Reservation_Price'].append(self.mm.reservation_price(mid))
         self.record['Bid'].append(bid)
         self.record['Ask'].append(ask)
         self.record['Position'].append(self.mm.position)
-        self.record['PnL'].append(self.mm.pnl)
+        self.record['PnL'].append(self.mm.pnl(mid))
         self.record['Spread'].append(ask - bid)
 
     # Returns results of trade strategy

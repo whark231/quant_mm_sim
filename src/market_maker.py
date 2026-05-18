@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 class MarketMaker():
     def __init__(self, starting_wealth, order_book: OrderBook, gamma = 0.1, sigma = 2.0, kappa = 1.5):
         self.cash = starting_wealth
+        self.starting_weatlth = starting_wealth
         self.order_book = order_book
         self.position = 0.0
         self.gamma = gamma # risk aversion
@@ -16,10 +17,6 @@ class MarketMaker():
         self.current_bid_id = None
         self.current_ask_id = None
 
-
-    @property 
-    def pnl(self) -> float:
-        return self.cash + self.position * self.order_book.mid_price
 
     @property
     def dynamic_gamma(self) -> float:
@@ -38,6 +35,9 @@ class MarketMaker():
         # How much we discount the mid_price based on inventory risk
         inventory_penalty = self.position * self.gamma * self.sigma**2 * self.time_remaining
         return mid_price - inventory_penalty
+    
+    def pnl(self, mid_price: float) -> float:
+        return (self.cash + self.position * mid_price) - self.starting_weatlth
     
     def update_inventory(self, side: Side, filled_size: float, filled_price: float):
         if side == Side.BID:
