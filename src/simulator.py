@@ -78,9 +78,18 @@ class Simulator():
 
             if trade['side'] == 'buy' and trade['price'] >= ask_order.price:
                 self.mm.update_inventory(Side.ASK, min(trade['size'], ask_order.remaining_size), trade['price'])
+
+    # populate order book with a few orders
+    def warmup(self, n=20):
+        for i in range(n):
+            row = self.df.iloc[i]
+            side = Side.BID if row['side'] == 'buy' else Side.ASK
+            order = Order(price=row['price'], size=row['size'], side=side)
+            self.book.add_order(order)
         
     # runs the simulation
-    def run(self):
+    def run(self, warmup_periods=20):
+        self.warmup(warmup_periods)
         for i in range(len(self.df)):
             self.update_market(i)
             self.cancel_old_quotes()
