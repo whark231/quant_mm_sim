@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 
 class MarketMaker():
-    def __init__(self, starting_wealth, order_book: OrderBook, gamma = 0.1, sigma = 2.0, kappa = 1.5):
+    def __init__(self, starting_wealth, order_book: OrderBook, gamma=0.1, sigma=2.0, kappa=1.5, alpha=1.0, beta=1.0):
         self.cash = starting_wealth
         self.starting_weatlth = starting_wealth
         self.order_book = order_book
@@ -12,6 +12,8 @@ class MarketMaker():
         self.gamma = gamma # risk aversion
         self.sigma = sigma # per tick vol
         self.kappa = kappa # order arrival sensitvity
+        self.alpha = alpha
+        self.beta = beta
         self.session_start = None
         self.session_duration_hours = 8.0 # trading day length
         self.current_bid_id = None
@@ -20,7 +22,8 @@ class MarketMaker():
 
     @property
     def dynamic_gamma(self) -> float:
-        return self.gamma
+        # alpha, beta ~ risk-aversion as inventory builds and time runs out respectively
+        return self.gamma * (1+ self.alpha * self.position**2) * (1 + self.beta * (1 - self.time_remaining))
     
     @property
     def time_remaining(self) -> float:
@@ -31,9 +34,9 @@ class MarketMaker():
         elapsed_fraction = elapsed / (self.session_duration_hours * 3600)
         return max(0.0, 1.0 - elapsed_fraction)
 
-    def reservation_price(self, mid_price: float) -> float:
+    def reservation_price(self, mid_price: float, dynamic_sigma) -> float:
         # How much we discount the mid_price based on inventory risk
-        inventory_penalty = self.position * self.gamma * self.sigma**2 * self.time_remaining
+        inventory_penalty = self.position * self.dynamic_gamma * dynamic_sigma**2 * self.time_remaining
         return mid_price - inventory_penalty
     
     def pnl(self, mid_price: float) -> float:
@@ -51,17 +54,17 @@ class MarketMaker():
         self.current_bid_ask = None
         self.current_bid_ask = None
 
-    def get_quotes(self, mid_price: float):
+    def get_quotes(self, mid_price: float, dynamic_sigma: float):
         # Compensation for holding risk over remaining time
-        risk_term = self.gamma * self.sigma**2 * self.time_remaining
+        risk_term = self.dynamic_gamma * dynamic_sigma**2 * self.time_remaining
 
         # Compensation for providing liquidity given order arrival rate
-        liquidity_term = (2 / self.gamma) * math.log(1 + self.gamma / self.kappa)
+        liquidity_term = (2 / self.dynamic_gamma) * math.log(1 + self.dynamic_gamma / self.kappa)
 
         spread =  risk_term + liquidity_term
 
-        bid = self.reservation_price(mid_price) - spread / 2
-        ask = self.reservation_price(mid_price) + spread / 2
+        bid = self.reservation_price(mid_price, dynamic_sigma) - spread / 2
+        ask = self.reservation_price(mid_price, dynamic_sigma) + spread / 2
         return bid, ask
     
     def print_quotes(self) -> None:

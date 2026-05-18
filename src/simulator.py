@@ -1,6 +1,7 @@
 from src.order_book import OrderBook, Order, Side
 from src.market_maker import MarketMaker
 import pandas as pd
+import numpy as np
 
 
 class Simulator():
@@ -26,14 +27,22 @@ class Simulator():
         if len(self.price_history) < 2:
             return None
         return sum(self.price_history[-self.mid_price_window:]) / min(len(self.price_history), self.mid_price_window)
+    
+    @property
+    def dynamic_sigma(self) -> float:
+        if len(self.price_history) < self.mid_price_window + 1:
+            return 2.0  # fallback default
+        data = self.price_history[-self.mid_price_window:]
+        return np.std([(curr - prev) / prev for prev, curr in zip(data, data[1:])], ddof=1)
+
 
     # Records performance during simulation
     def record_state(self, i):
         mid = self.current_mid_price
-        bid, ask = self.mm.get_quotes(mid)
+        bid, ask = self.mm.get_quotes(mid, self.dynamic_sigma)
         self.record['Time'].append(i)
         self.record['Mid_Price'].append(mid)
-        self.record['Reservation_Price'].append(self.mm.reservation_price(mid))
+        self.record['Reservation_Price'].append(self.mm.reservation_price(mid, self.dynamic_sigma))
         self.record['Bid'].append(bid)
         self.record['Ask'].append(ask)
         self.record['Position'].append(self.mm.position)
@@ -63,7 +72,7 @@ class Simulator():
 
     # Posts new quotes
     def post_new_quotes(self):
-        bid, ask = self.mm.get_quotes(self.current_mid_price)
+        bid, ask = self.mm.get_quotes(self.current_mid_price, self.dynamic_sigma)
         bid_order = Order(price=bid, size=0.01, side=Side.BID)
         ask_order = Order(price=ask, size=0.01, side=Side.ASK)
 
@@ -96,7 +105,7 @@ class Simulator():
             self.price_history.append(row['price'])
             side = Side.BID if row['side'] == 'buy' else Side.ASK
             order = Order(price=row['price'], size=row['size'], side=side)
-            self.book.add_order(order)
+            self.book.add_order(order)        
         
     # runs the simulation
     def run(self):
