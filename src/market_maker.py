@@ -1,5 +1,5 @@
 import math
-from src.order_book import Order, OrderBook, Side
+from src.order_book import OrderBook, Side
 from datetime import datetime, timezone
 
 
@@ -40,13 +40,13 @@ class MarketMaker():
         elapsed_fraction = elapsed / (self.session_duration_hours * 3600)
         return max(0.0, 1.0 - elapsed_fraction)
 
-    def update_inventory(self, order: Order):
-        if order.side == Side.BID:
-            self.position += order.filled_size
-            self.cash -= order.filled_size * order.filled_price
+    def update_inventory(self, side: Side, filled_size: float, filled_price: float):
+        if side == Side.BID:
+            self.position += filled_size
+            self.cash -= filled_size * filled_price
         else:
-            self.position -= order.filled_size
-            self.cash += order.filled_size * order.filled_price
+            self.position -= filled_size
+            self.cash += filled_size * filled_price
 
     def cancel_quotes(self):
         self.current_bid_ask = None
