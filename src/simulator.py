@@ -33,7 +33,7 @@ class Simulator():
         if len(self.price_history) < self.mid_price_window + 1:
             return 2.0  # fallback default
         data = self.price_history[-self.mid_price_window:]
-        return np.std([(curr - prev) / prev for prev, curr in zip(data, data[1:])], ddof=1)
+        return np.std([(curr - prev)  for prev, curr in zip(data, data[1:])], ddof=1)
     
     
     def current_ofi(self, i: int, ofi_window: int = 50) -> float:
