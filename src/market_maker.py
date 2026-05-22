@@ -55,7 +55,7 @@ class MarketMaker():
         self.current_bid_ask = None
         self.current_bid_ask = None
 
-    def get_quotes(self, mid_price: float, dynamic_sigma: float, ofi: float, scaling_factor: float = 2.0):
+    def get_quotes(self, mid_price: float, dynamic_sigma: float = 2.0, ofi: float = 0.8, scaling_factor: float = 2.0):
         # Compensation for holding risk over remaining time
         risk_term = self.dynamic_gamma * dynamic_sigma**2 * self.time_remaining
 
@@ -72,13 +72,16 @@ class MarketMaker():
         ask = r + spread / 2
         return bid, ask
     
-    def print_quotes(self) -> None:
-        bid, ask = self.get_quotes()
-        print(
-            f"Reservation Price: ${self.reservation_price:,.2f}\n"
-            f"Bid              : ${bid:,.2f}\n"
-            f"Ask              : ${ask:,.2f}"
-        )
+    def print_quotes(self, mid_price=None):
+        if mid_price is None:
+            mid_price = self.order_book.mid_price
+        if mid_price is None:
+            print("No mid-price available — order book is empty")
+            return
+        bid, ask = self.get_quotes(mid_price, self.dynamic_sigma if hasattr(self, 'dynamic_sigma') else 2.0)
+        print(f"Bid: {bid:.2f}")
+        print(f"Ask: {ask:.2f}")
+        print(f"Reservation Price: {self.reservation_price(mid_price, self.dynamic_sigma if hasattr(self, 'dynamic_sigma') else 2.0):.2f}")
 
     def start_session(self):
         self.session_start = datetime.now(timezone.utc)
