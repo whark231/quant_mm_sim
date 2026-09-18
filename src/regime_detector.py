@@ -10,7 +10,7 @@ class HMM():
         self.mu = np.random.randn(n_states, n_feats) # emission means (n_states x n_feats)
         self.sigma = np.array([np.eye(n_feats) for _ in range(n_states)]) # emission covariances (n_states x n_features x n_featrues)
 
-    # gives probabilities of seeing observation at time t in each state k (to be used later for bayes rule)
+    # gives probabilities of seeing observation at time t given state k (to be used later for bayes rule)
     def emission_prob(self, o_t):
         b = []
         for k in range(self.n_states):
@@ -18,6 +18,7 @@ class HMM():
 
         return np.array(b)
 
+    # Captures joint probability of being in state k and seeing observations up until time t
     def forward(self, observations):
         # observations: shape (T, n_feats)
         # returns: alpha of shape (T, n_states)
@@ -33,3 +34,22 @@ class HMM():
 
         return alpha
     
+    # Captures conditional probability of each future observation up until time T given state k at time t
+    def backward(self, observations):
+        T = len(observations)
+        beta = np.zeros((T, self.n_states))
+
+        # base case
+        beta[T-1] = 1
+
+        # recursion
+        for t in range(T-2, -1, -1):
+            b = self.emission_prob(observations[t+1])
+            beta[t] = self.A @ (b * beta[t+1])
+
+        return beta
+
+    # Result of bayes rule: probability of being in state k given all of the observations
+    def compute_gamma(self, alpha, beta):
+        # shape: (T, n_states)
+        return (alpha * beta) / np.sum(alpha * beta, axis=1, keepdims=True)
