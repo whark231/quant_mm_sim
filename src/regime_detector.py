@@ -53,3 +53,63 @@ class HMM():
     def compute_gamma(self, alpha, beta):
         # shape: (T, n_states)
         return (alpha * beta) / np.sum(alpha * beta, axis=1, keepdims=True)
+
+    def compute_xi(self, observations, alpha, beta):
+        T = len(observations)
+        xi = np.zeros((T-1, self.n_states, self.n_states))
+
+        for t in range(T-1):
+            b = self.emission_prob(observations[t+1])
+            numerator = alpha[t].reshape(-1, 1) * self.A * (b * beta[t+1]).reshape(1, -1)
+            xi[t] = numerator / np.sum(numerator)
+
+        return xi
+
+    def m_step(self, observations, gamma, xi):
+        T = len(observations)
+        alpha = self.forward(observations)
+        beta = self.backward(observations)
+
+        # update pi
+        self.pi = gamma[0]
+
+        # update A
+        self.A = xi.sum(axis=0) / gamma[:-1].sum(axis=0, keepdims=True).T
+
+        # update mu and sigma
+        for k in range(self.n_states):
+            gamma_k = gamma[:, k]  # shape (T,) — weight for state k at each timestep
+            
+            # update mu
+            self.mu[k] = np.sum(gamma_k.reshape(-1,1) * observations, axis=0) / np.sum(gamma_k)
+
+            # update sigma
+            diff = observations - self.mu[k]  # shape (T, n_feats)
+            self.sigma[k] = (gamma_k.reshape(-1,1) * diff).T @ diff / np.sum(gamma_k)
+
+    def fit(self, observations, n_iter=100, tol=1e-4):
+        prev_log_likelihood = None
+
+        for i in range(n_iter):
+            # E step
+            alpha = self.forward(observations)
+            beta = self.backward(observations)
+            gamma = self.compute_gamma(alpha, beta)
+            xi = self.compute_xi(observations, alpha, beta)
+
+            # M step
+            self.m_step(observations, gamma, xi)
+
+            # check convergence
+            log_likelihood = np.log(alpha[-1].sum())
+            if prev_log_likelihood is not None:
+                if abs(log_likelihood - prev_log_likelihood) < tol:
+                    print(f"Converged at iteration {i}")
+                    break
+            prev_log_likelihood = log_likelihood
+
+
+    def predict_regime(self, observations):
+        alpha = self.forward(observations)
+        probs = alpha[-1] / alpha[-1].sum()
+        return np.argmax(probs)
