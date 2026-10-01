@@ -67,8 +67,6 @@ class HMM():
 
     def m_step(self, observations, gamma, xi):
         T = len(observations)
-        alpha = self.forward(observations)
-        beta = self.backward(observations)
 
         # update pi
         self.pi = gamma[0]
