@@ -1,11 +1,12 @@
 from src.order_book import OrderBook, Order, Side
 from src.market_maker import MarketMaker
+from src.regime_detector import HMM
 import pandas as pd
 import numpy as np
 
 
 class Simulator():
-    def __init__(self, mm: MarketMaker, book: OrderBook, df: pd.DataFrame, window: int):
+    def __init__(self, mm: MarketMaker, book: OrderBook, df: pd.DataFrame, window: int, hmm=None, regime_params=None, scaler=None):
         self.mm = mm
         self.book = book
         self.df = df
@@ -21,6 +22,11 @@ class Simulator():
         }
         self.price_history = []
         self.mid_price_window = window
+        self.hmm = hmm
+        self.regime_params = regime_params
+        self.scaler = scaler  # fit on the HMM's training observations; keeps live features on the same scale the model was trained on
+        self.obs_buffer = []
+        self.n_feats = hmm.n_feats if hmm is not None else 3
 
     @property
     def current_mid_price(self) -> float:
@@ -113,6 +119,28 @@ class Simulator():
             if trade['side'] == 'buy' and trade['price'] >= ask_order.price:
                 self.mm.update_inventory(Side.ASK, min(trade['size'], ask_order.remaining_size), trade['price'])
 
+    def current_observation(self, i):
+
+        if len(self.price_history) < 2:
+            obs = np.zeros(self.n_feats)
+        else:
+            log_return = np.log(self.price_history[-1] / self.price_history[-2])
+            obs = np.array([log_return, self.dynamic_sigma, self.current_ofi(i)])
+
+        # HMM's mu/sigma were fit on scaler-transformed observations, so raw
+        # tick-level features have to go through the same transform before
+        # reaching predict_regime() — otherwise they're on the wrong scale and
+        # look like outliers to every state.
+        if self.scaler is not None:
+            obs = self.scaler.transform(obs.reshape(1, -1))[0]
+
+        return obs
+
+    def _apply_regime(self, regime):
+        params = self.regime_params[regime]
+        self.mm.gamma = params['gamma']
+        self.mm.kappa = params['kappa']
+
     # populate order book with a few orders
     def warmup(self):
         for i in range(self.mid_price_window):
@@ -120,7 +148,10 @@ class Simulator():
             self.price_history.append(row['price'])
             side = Side.BID if row['side'] == 'buy' else Side.ASK
             order = Order(price=row['price'], size=row['size'], side=side)
-            self.book.add_order(order)        
+            self.book.add_order(order)
+
+            if len(self.price_history) >= 2:
+                self.obs_buffer.append(self.current_observation(i))        
         
     # runs the simulation
     def run(self, pause_threshold: float = 0.8):
@@ -129,7 +160,18 @@ class Simulator():
             ofi = self.current_ofi(i)
             self.mm.is_quoting = abs(ofi) <= pause_threshold
             self.update_market(i)
+
+            # update obs buffer as sliding window
+            self.obs_buffer.append(self.current_observation(i))
+            if len(self.obs_buffer) > self.mid_price_window:
+                self.obs_buffer.pop(0)
+
             self.cancel_old_quotes()
+
+            if self.hmm is not None and len(self.obs_buffer) >= self.mid_price_window:
+                regime = self.hmm.predict_regime(np.array(self.obs_buffer))
+                self._apply_regime(regime)
+            
             self.post_new_quotes(ofi)
             self.check_for_fills(i)
             self.record_state(i, ofi)
